@@ -5,7 +5,7 @@ and builds a 24 KB DOS program, `TOMB.COM`, that runs in DOSBox.
 
 * **How to run it, step by step: see [HOW_TO_RUN.md](HOW_TO_RUN.md)** (double-click `RUN.BAT` after installing DOSBox).
 * Same core rules and controls as the ICMC version, but zoomed in (16x16 tiles, smooth scrolling camera),
-  with a five-map authored campaign, a Tomb-of-the-Mask-style endless-mode generator, rising lava in endless mode,
+  with a five-map campaign, a Tomb-of-the-Mask-style endless-mode generator, rising lava in endless mode,
   a stage-failed death overlay, and an instant room change.
 
 ![screenshots](docs/screenshots.png)
@@ -15,7 +15,7 @@ and builds a 24 KB DOS program, `TOMB.COM`, that runs in DOSBox.
 |---|---|
 | Platform | DOS / DOSBox, VGA 320x200, double-buffered, synced to the 70 Hz retrace |
 | Zoom | about 20x10 tiles visible, camera follows the player; auto-tiled walls, sprites, spiked traps |
-| Maps | five authored 40x28 ICMC maps live in `Simulador/tomb_of_mask.asm`; the campaign uses these maps, and the extractor copies them into the DOS assembly and C reference data. Endless mode uses generated rooms with chambers, obstacles, and solver-checked placements |
+| Maps | five distinct 40x28 campaign maps live in `Simulador/tomb_of_mask.asm`, with compact chambers, tight corridors, and routes designed around wall-to-wall dashes; the extractor copies them into the DOS assembly and C reference data. Endless mode uses generated rooms with chambers, obstacles, and solver-checked placements |
 | Endless pressure | a red lava trail climbs from below, advances every second, and ends the run when it reaches the player |
 | Trap feedback | hitting an unshielded trap displays **STAGE FAILED** before restarting a normal stage or ending an endless run |
 | Slow room change | the ICMC version redrew all 1200 cells 30-40 times and waited ~2.7M simulated instructions after each step. Here the change is one memory blit per frame (~0.3 s) and only changed frames are drawn. A patched `Simulador/tomb_of_mask.asm/.mif` (4 words changed) makes the old version ~4x faster too |

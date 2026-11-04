@@ -548,7 +548,7 @@ stage_select:
     div bx
     mov word ptr [stage_row], ax
     mov word ptr [stage_col], dx
-    # Stage tiles are a single row of the five authored maps.
+    # Stage tiles are a single row of the five campaign maps.
     imul bx, dx, 52
     add bx, 32
     imul cx, ax, 18
