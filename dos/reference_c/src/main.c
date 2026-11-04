@@ -302,7 +302,7 @@ static void play(void)
             if (g.mode == MODE_NORMAL) {
                 g.level++;
                 if (g.level >= NUM_LEVELS) { pause_frames(30); end_screen("YOU WIN!", -1, g.coins); return; }
-                gen_room(&next_room, &seed, g.level + 1);
+                room_load_level(&next_room, g.level);
             } else {
                 g.depth++;
                 gen_room(&next_room, &seed, g.depth);   /* hidden inside the pause */
@@ -321,8 +321,8 @@ static void play(void)
 static void start_game(int mode)
 {
     g.mode = mode; g.coins = 0; g.level = 0; g.depth = 1;
-    /* Keep normal stages in the same chunky tomb-maze style as endless mode. */
-    gen_room(&g.room, &seed, 1);
+    if (mode == MODE_NORMAL) room_load_level(&g.room, g.level);
+    else gen_room(&g.room, &seed, 1);
     lava_y = g.room.h + 4; lava_clock = 0;
     game_enter_room(&g);
     play();

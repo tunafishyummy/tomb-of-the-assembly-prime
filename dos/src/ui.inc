@@ -520,7 +520,7 @@ menu_screen:
     mov ax, -1
     ret
 
-# stage_select: 30-stage grid; AX = selected stage index (0..29), -1 = back
+# stage_select: five-stage row; AX = selected stage index (0..4), -1 = back
 stage_select:
     mov word ptr [stage_sel], 0
     mov word ptr [m_redraw], 1
@@ -548,7 +548,7 @@ stage_select:
     div bx
     mov word ptr [stage_row], ax
     mov word ptr [stage_col], dx
-    # stage tile position: five columns, six rows
+    # Stage tiles are a single row of the five authored maps.
     imul bx, dx, 52
     add bx, 32
     imul cx, ax, 18
@@ -596,7 +596,7 @@ stage_select:
     sub bx, 9
     # pixel-style brackets around the number, brighter when selected
     inc word ptr [m_i]
-    cmp word ptr [m_i], 30
+    cmp word ptr [m_i], NUM_LEVELS
     jl .Lss_items
     mov si, offset str_stage_hint
     mov cx, 171
@@ -615,9 +615,9 @@ stage_select:
     test dl, dl
     jz .Lss_down
     mov ax, word ptr [stage_sel]
-    sub ax, 5
+    dec ax
     jns .Lss_set
-    add ax, 30
+    mov ax, NUM_LEVELS-1
     jmp .Lss_set
 .Lss_down:
     mov ax, word ptr [m_key]
@@ -625,10 +625,10 @@ stage_select:
     test dl, dl
     jz .Lss_left
     mov ax, word ptr [stage_sel]
-    add ax, 5
-    cmp ax, 30
+    inc ax
+    cmp ax, NUM_LEVELS
     jl .Lss_set
-    sub ax, 30
+    xor ax, ax
     jmp .Lss_set
 .Lss_left:
     mov ax, word ptr [m_key]
@@ -639,7 +639,7 @@ stage_select:
     dec ax
     cmp ax, 0
     jge .Lss_set
-    mov ax, 29
+    mov ax, NUM_LEVELS-1
     jmp .Lss_set
 .Lss_right:
     mov ax, word ptr [m_key]
@@ -648,7 +648,7 @@ stage_select:
     jz .Lss_enter
     mov ax, word ptr [stage_sel]
     inc ax
-    cmp ax, 30
+    cmp ax, NUM_LEVELS
     jl .Lss_set
     xor ax, ax
 .Lss_set:
@@ -1344,14 +1344,16 @@ play:
     inc word ptr [g_level]
     cmp word ptr [g_level], NUM_LEVELS
     jl .Lpc_load
-    # Keep normal mode continuous: after the final stage, wrap to stage 1
-    # instead of showing the YOU WIN screen and returning to the menu.
-    mov word ptr [g_level], 0
+    mov word ptr [e_rooms], -1
+    mov ax, word ptr [g_coins]
+    mov word ptr [e_coins], ax
+    mov si, offset str_win
+    call end_screen
+    ret
 .Lpc_load:
     mov ax, word ptr [g_level]
-    inc ax
     mov di, offset next_room
-    call gen_room
+    call room_load_level
     jmp .Lpc_go
 .Lpc_endless:
     inc word ptr [g_depth]
@@ -1387,15 +1389,9 @@ start_game:
     mov word ptr [g_depth], 1
     cmp ax, MODE_NORMAL
     jne .Lsg1
-    # A level index always starts from its own seed, so replaying it gives the same map.
-    movzx eax, word ptr [g_level]
-    imul eax, eax, 40503
-    add eax, 44257
-    mov dword ptr [seed], eax
     mov ax, word ptr [g_level]
-    inc ax
     mov di, offset room
-    call gen_room
+    call room_load_level
     jmp .Lsg2
 .Lsg1:
     mov word ptr [g_level], 0

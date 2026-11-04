@@ -60,4 +60,4 @@
     .equ EV_DEAD, 2
     .equ EV_COIN, 4
     .equ EV_ITEM, 8
-    .equ NUM_LEVELS, 30
+    .equ NUM_LEVELS, 5

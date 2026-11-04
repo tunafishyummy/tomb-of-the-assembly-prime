@@ -22,7 +22,7 @@ TOMB.COM: build/tomb.o src/tomb.ld
 assets:
 	python3 tools/gen_assets_asm.py src/assets.inc
 levels:
-	python3 tools/extract_levels_asm.py ../Simulador/tomb_of_mask.asm src/levels.inc
+	python3 tools/extract_levels_asm.py ../Simulador/tomb_of_mask.asm src/levels.inc reference_c/src/levels.h
 
 tests/x86run: tests/x86run.c
 	gcc -O2 -Wno-unused -o $@ $<

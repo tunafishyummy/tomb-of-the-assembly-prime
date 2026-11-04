@@ -1,6 +1,7 @@
 # How to run Tomb of the Assembly (DOS edition) - step by step
 
-You do **not** need to build anything. `TOMB.COM` is already assembled from the `.s` source files.
+You do **not** need to build anything to play the bundled `TOMB.COM`. To use the updated authored
+maps, however, rebuild it once as described in Part 4; the bundled executable may predate those maps.
 You only need DOSBox, a free program that pretends to be an old DOS computer.
 
 ---------------------------------------------------------------------------
@@ -102,7 +103,14 @@ in Intel syntax. The output is a flat DOS `.COM` file.
 2. Open the Ubuntu terminal and run: `sudo apt update && sudo apt install -y binutils make`
 3. In Windows Explorer open the `dos` folder, click the address bar, type `cmd`, press Enter, then run
    `BUILD_WITH_WSL.bat`  (or inside Ubuntu: `cd /mnt/c/Tomb/dos` and `make`).
-4. A fresh `TOMB.COM` appears. Run it as in Part 1.
+4. From the `dos` directory, regenerate the map data and build the executable:
+
+       make levels
+       make
+
+   This copies the five maps from `Simulador/tomb_of_mask.asm` into the DOS build and creates a fresh
+   `TOMB.COM`. Run it as in Part 1; choose **NORMAL MODE** to play the authored maps. Endless mode
+   continues to use generated rooms.
 
 ### On Linux / macOS (with an x86 binutils)
     cd dos
