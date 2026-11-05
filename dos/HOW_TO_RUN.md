@@ -103,14 +103,13 @@ in Intel syntax. The output is a flat DOS `.COM` file.
 2. Open the Ubuntu terminal and run: `sudo apt update && sudo apt install -y binutils make`
 3. In Windows Explorer open the `dos` folder, click the address bar, type `cmd`, press Enter, then run
    `BUILD_WITH_WSL.bat`  (or inside Ubuntu: `cd /mnt/c/Tomb/dos` and `make`).
-4. From the `dos` directory, regenerate the map data and build the executable:
+4. From the `dos` directory, build the executable:
 
-       make levels
        make
 
-   This compiles the five editable map grids from `Simulador/tomb_of_mask.asm` into the DOS build and
-   creates a fresh `TOMB.COM`. Run it as in Part 1; choose **NORMAL MODE** to play the campaign. Endless mode
-   continues to use generated rooms.
+   The build regenerates the campaign data from `campaign_maps.txt` before assembling the game.
+   Run it as in Part 1; choose **NORMAL MODE** to play the campaign. Endless mode continues to use
+   generated rooms.
 
 ### On Linux / macOS (with an x86 binutils)
     cd dos

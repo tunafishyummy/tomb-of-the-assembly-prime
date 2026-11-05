@@ -22,7 +22,7 @@ TOMB.COM: build/tomb.o src/tomb.ld
 assets:
 	python3 tools/gen_assets_asm.py src/assets.inc
 levels:
-	python3 tools/extract_levels_asm.py ../Simulador/tomb_of_mask.asm src/levels.inc reference_c/src/levels.h
+	python3 tools/extract_levels_asm.py campaign_maps.txt ../Simulador/tomb_of_mask.asm src/levels.inc reference_c/src/levels.h
 .PHONY: all assets levels test clean
 
 tests/x86run: tests/x86run.c

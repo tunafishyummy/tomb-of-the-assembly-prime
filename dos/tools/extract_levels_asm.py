@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """Compile editable campaign grids into the simulator, DOS assembly, and C data.
 
-Usage: python3 tools/extract_levels_asm.py ../Simulador/tomb_of_mask.asm \
-       src/levels.inc reference_c/src/levels.h
+Usage: python3 tools/extract_levels_asm.py campaign_maps.txt \
+       ../Simulador/tomb_of_mask.asm src/levels.inc reference_c/src/levels.h
 """
 import re
 import sys
 
-asm_path, asm_output, c_output = sys.argv[1:4]
-with open(asm_path, encoding="utf-8", errors="replace") as source:
-    asm = source.read().replace("\r", "")
+map_path, simulator_path, asm_output, c_output = sys.argv[1:5]
+with open(map_path, encoding="utf-8") as source:
+    map_source = source.read().replace("\r", "")
+with open(simulator_path, encoding="utf-8", errors="replace") as source:
+    simulator = source.read().replace("\r", "")
 
 
 def editable_maps(source):
@@ -17,7 +19,7 @@ def editable_maps(source):
     lines = source.splitlines()
     index = 0
     while index < len(lines):
-        begin = re.fullmatch(r"; MAP_EDIT_BEGIN ([1-5])", lines[index])
+        begin = re.fullmatch(r"MAP ([1-5])", lines[index])
         if not begin:
             index += 1
             continue
@@ -26,25 +28,13 @@ def editable_maps(source):
         if level_number in maps:
             raise ValueError("duplicate editable map %d" % level_number)
         index += 1
-        rows = []
-        while index < len(lines):
-            if re.fullmatch(r"; MAP_EDIT_END ([1-5])", lines[index]):
-                break
-            row = re.fullmatch(r"; ?(.*)", lines[index])
-            if not row:
-                raise ValueError("map%d contains a non-comment line" % level_number)
-            rows.append(row.group(1))
-            index += 1
-        if index == len(lines):
-            raise ValueError("map%d is missing MAP_EDIT_END" % level_number)
-        if lines[index] != "; MAP_EDIT_END %d" % level_number:
-            raise ValueError("map%d has a mismatched MAP_EDIT_END" % level_number)
+        rows = lines[index:index + 28]
         if len(rows) != 28:
             raise ValueError("map%d must contain exactly 28 rows" % level_number)
         if any(len(row) != 40 for row in rows):
             raise ValueError("every map%d row must contain exactly 40 tiles" % level_number)
         maps[level_number] = rows
-        index += 1
+        index += 28
 
     if set(maps) != set(range(1, 6)):
         raise ValueError("editable map blocks 1 through 5 are required")
@@ -53,7 +43,7 @@ def editable_maps(source):
 
 tile_map = {"#": "}", ".": " ", "C": "#", "S": " ", "E": " "}
 game_tiles = set("}{*$=@%<&^|!")
-maps = editable_maps(asm)
+maps = editable_maps(map_source)
 levels = []
 starts = []
 exits = []
@@ -83,35 +73,35 @@ for i in range(1, 6):
 
 flips = []
 for i in range(1, 6):
-    match = re.search(r"static flip%d \+ #0, #(\d+)" % i, asm)
+    match = re.search(r"static flip%d \+ #0, #(\d+)" % i, simulator)
     if not match:
         raise ValueError("missing map metadata: flip%d" % i)
     flips.append(int(match.group(1)))
 
-updated_asm = asm
+updated_simulator = simulator
 for i, level in enumerate(levels, 1):
-    match = re.search(r'^level%d : string "(.*)"\s*$' % i, updated_asm, re.M)
+    match = re.search(r'^level%d : string "(.*)"\s*$' % i, updated_simulator, re.M)
     if not match or len(match.group(1)) != 1200:
         raise ValueError("level%d must have an existing 1200-character string" % i)
     encoded = level + match.group(1)[1120:]
-    updated_asm = re.sub(
+    updated_simulator = re.sub(
         r'^level%d : string ".*"\s*$' % i,
         'level%d : string "%s"' % (i, encoded),
-        updated_asm,
+        updated_simulator,
         count=1,
         flags=re.M,
     )
-    updated_asm, start_count = re.subn(
+    updated_simulator, start_count = re.subn(
         r"(static start%d \+ #0, #)\d+" % i,
         r"\g<1>%d" % starts[i - 1],
-        updated_asm,
+        updated_simulator,
         count=1,
     )
-    updated_asm, exit_count = re.subn(
+    updated_simulator, exit_count = re.subn(
         r"(static exit%d \+ #0, #)\d+(?:\s*;.*)?$" % i,
         r"\g<1>%d ; (%d,%d) opening in the outer wall" %
         (exits[i - 1], exits[i - 1] % 40, exits[i - 1] // 40),
-        updated_asm,
+        updated_simulator,
         count=1,
         flags=re.M,
     )
@@ -161,5 +151,5 @@ c_header.extend([
 with open(c_output, "w", encoding="utf-8", newline="\n") as output:
     output.write("\n".join(c_header) + "\n")
 
-with open(asm_path, "w", encoding="utf-8", newline="\n") as source:
-    source.write(updated_asm)
+with open(simulator_path, "w", encoding="utf-8", newline="\n") as source:
+    source.write(updated_simulator)

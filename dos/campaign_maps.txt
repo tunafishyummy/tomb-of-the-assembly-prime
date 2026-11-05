@@ -1,8 +1,8 @@
-MAP EDIT PREVIEW (40 columns x 28 rows; preview only)
-Walls: #   Floor: .   Start: S   Exit: E
+CAMPAIGN MAPS (40 columns x 28 rows)
+Walls: #   Floor: .   Crate: C   Start: S   Exit: E
 Coins: *   Trap: {   Key: $   Door: =   Bomb: &   Breakable wall: |
-S and E are preview markers; the game stores start and exit positions separately.
-Each character is one tile. Copy/edit rows without changing their 40-character width.
+S and E mark the start and exit; the game stores them as map metadata.
+Edit the rows directly. Keep each row exactly 40 characters wide. Build from dos/ to apply changes.
 
 MAP 1
 #########################E##############
@@ -153,4 +153,3 @@ MAP 5
 ####.....###############################
 ####.....###############################
 ########################################
-
