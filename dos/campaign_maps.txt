@@ -1,8 +1,11 @@
 CAMPAIGN MAPS (40 columns x 28 rows)
-Walls: #   Floor: .   Crate: C   Start: S   Exit: E
-Coins: *   Trap: {   Key: $   Door: =   Bomb: &   Breakable wall: |
-S and E mark the start and exit; the game stores them as map metadata.
-Edit the rows directly. Keep each row exactly 40 characters wide. Use build with WSL thing
+Wall: #   Floor: .   Player start: S or z   Exit: E   Crate: C
+Coin: *   Trap: {   Key: $   Door: =   Plate: @   Gate: %
+Lever: <   Bomb: &   Shield: ^   Breakable wall: |   Toggle wall: !
+The game legend uses # for crates; use C here because # marks walls in this editor.
+S/z and E are metadata markers and become floor tiles in the game map.
+Use < to activate ! walls; each map supports up to four toggle walls.
+Edit the rows directly. Keep each row exactly 40 characters wide.
 
 MAP 1
 #########################E##############

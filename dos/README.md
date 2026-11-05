@@ -44,10 +44,13 @@ screen. The game logic was also exercised in a headless 386 emulator with random
     Simulador/   patched tomb_of_mask.asm / .mif for the original simulator (faster room change)
 
 Edit the five grids in `dos/campaign_maps.txt`. Each map is 28 rows by 40 columns:
-`#` is a wall, `.` is floor, `C` is a crate, and `S`/`E` mark the player start and exit.
-Other tiles use their in-game symbols, such as `*` for a coin, `{` for a trap, `$` for a key,
-`=` for a door, `&` for a bomb, and `|` for a breakable wall. Keep every row exactly 40 characters
-wide. The compact simulator strings and DOS map data are generated from these grids.
+`#` is a wall, `.` is floor, `C` is a crate, and `S` or `z` marks the player start. `E` marks the
+exit. The other in-game symbols are supported directly: `*` coin, `{` trap, `$` key, `=` door,
+`@` plate, `%` gate, `<` lever, `&` bomb, `^` shield, `|` breakable wall, and `!` toggle wall.
+The legend's `#` crate uses `C` in the editor because `#` is reserved for walls. Start/exit markers
+become floor tiles; their positions are stored as metadata. A `<` lever toggles `!` walls; up to
+four toggle walls are supported per map. Keep every row exactly 40 characters wide. The compact
+simulator strings and DOS map data are generated from these grids.
 
 After editing a grid, regenerate the map data from `dos/`:
 

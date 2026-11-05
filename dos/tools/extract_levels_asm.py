@@ -46,42 +46,48 @@ def editable_maps(source):
     return maps
 
 
-tile_map = {"#": "}", ".": " ", "C": "#", "S": " ", "E": " "}
-game_tiles = set("}{*$=@%<&^|!")
+tile_map = {
+    "#": "}", ".": " ", "C": "#", "S": " ", "z": " ", "E": " ",
+    "}": "}", "{": "{", "*": "*", "$": "$", "=": "=", "@": "@",
+    "%": "%", "<": "<", "&": "&", "^": "^", "|": "|", "!": "!",
+}
 maps = editable_maps(map_source)
 levels = []
 starts = []
 exits = []
+flip_positions = []
 for i in range(1, 6):
     cells = []
     start = None
     exit_cell = None
+    toggles = []
     for y, row in enumerate(maps[i]):
         for x, tile in enumerate(row):
-            if tile == "S":
+            if tile in ("S", "z"):
                 if start is not None:
-                    raise ValueError("map%d must contain exactly one S start" % i)
+                    raise ValueError("map%d must contain exactly one player start (S or z)" % i)
                 start = y * 40 + x
             elif tile == "E":
                 if exit_cell is not None:
                     raise ValueError("map%d must contain exactly one E exit" % i)
                 exit_cell = y * 40 + x
-            elif tile not in tile_map and tile not in game_tiles:
+            elif tile not in tile_map:
                 raise ValueError("map%d contains unsupported tile %r at (%d,%d)" %
                                  (i, tile, x, y))
-            cells.append(tile_map.get(tile, tile))
+            cells.append(tile_map[tile])
+            if tile == "!":
+                position = y * 40 + x
+                if position == 0:
+                    raise ValueError("map%d cannot place a toggle wall at cell 0" % i)
+                toggles.append(position)
     if start is None or exit_cell is None:
         raise ValueError("map%d must contain exactly one S start and one E exit" % i)
+    if len(toggles) > 4:
+        raise ValueError("map%d can contain at most four toggle walls" % i)
     starts.append(start)
     exits.append(exit_cell)
+    flip_positions.append(toggles)
     levels.append("".join(cells))
-
-flips = []
-for i in range(1, 6):
-    match = re.search(r"static flip%d \+ #0, #(\d+)" % i, simulator)
-    if not match:
-        raise ValueError("missing map metadata: flip%d" % i)
-    flips.append(int(match.group(1)))
 
 updated_simulator = simulator
 for i, level in enumerate(levels, 1):
@@ -113,6 +119,21 @@ for i, level in enumerate(levels, 1):
     if start_count != 1 or exit_count != 1:
         raise ValueError("missing start/exit metadata for map%d" % i)
 
+    flip_values = flip_positions[i - 1] + [0]
+    flip_block = "flip%d: var #%d\n" % (i, len(flip_values))
+    flip_block += "".join(
+        "static flip%d + #%d, #%d\n" % (i, index, value)
+        for index, value in enumerate(flip_values)
+    )
+    updated_simulator, flip_count = re.subn(
+        r"(?m)^flip%d: var #\d+\n(?:static flip%d \+ #\d+, #\d+\n)+" % (i, i),
+        flip_block,
+        updated_simulator,
+        count=1,
+    )
+    if flip_count != 1:
+        raise ValueError("missing flip metadata for map%d" % i)
+
 for i, level in enumerate(levels):
     if level[starts[i]] != " " or level[exits[i]] != " ":
         raise ValueError("map%d start and exit markers must map to floor" % (i + 1))
@@ -133,8 +154,15 @@ for i, level in enumerate(levels, 1):
 assembly.extend([
     "level_start:  .word " + ",".join(map(str, starts)),
     "level_exit:   .word " + ",".join(map(str, exits)),
-    "level_flip:   .word " + ",".join(map(str, flips)),
+    "level_flip_count: .word " + ",".join(str(len(values)) for values in flip_positions),
+    "level_flip:   .word " + ",".join(
+        str(values[0] if values else 0) for values in flip_positions
+    ),
+    "level_flip_data:",
 ])
+for values in flip_positions:
+    assembly.append("    .word " + ",".join(map(str, values + [0] * (4 - len(values)))))
+
 with open(asm_output, "w", encoding="utf-8", newline="\n") as output:
     output.write("\n".join(assembly) + "\n")
 
@@ -151,7 +179,22 @@ c_header.extend([
     "};",
     "static const short level_start[LEVEL_COUNT] = {%s};" % ",".join(map(str, starts)),
     "static const short level_exit[LEVEL_COUNT] = {%s};" % ",".join(map(str, exits)),
-    "static const short level_flip[LEVEL_COUNT] = {%s};" % ",".join(map(str, flips)),
+    "static const short level_flip_count[LEVEL_COUNT] = {%s};" %
+    ",".join(str(len(values)) for values in flip_positions),
+    "static const short level_flip[LEVEL_COUNT] = {%s};" % ",".join(
+        str(values[0] if values else 0) for values in flip_positions
+    ),
+    "static const short level_flip_data[LEVEL_COUNT][4] = {",
+])
+c_header.extend(
+    "  {%s}%s" % (
+        ",".join(map(str, values + [0] * (4 - len(values)))),
+        "," if i < 4 else "",
+    )
+    for i, values in enumerate(flip_positions)
+)
+c_header.extend([
+    "};",
 ])
 with open(c_output, "w", encoding="utf-8", newline="\n") as output:
     output.write("\n".join(c_header) + "\n")

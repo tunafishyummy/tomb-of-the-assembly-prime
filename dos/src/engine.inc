@@ -43,12 +43,19 @@ room_load_level:
     div cx
     mov word ptr [di+R_EX], dx
     mov word ptr [di+R_EY], ax
-    mov ax, word ptr [level_flip+bx]
-    mov word ptr [di+R_FLIP], ax
-    mov word ptr [di+R_NFLIP], 0
-    test ax, ax
-    jz .Lrl_ret
-    mov word ptr [di+R_NFLIP], 1
+    mov ax, word ptr [level_flip_count+bx]
+    mov word ptr [di+R_NFLIP], ax
+    shl bx, 2
+    mov si, offset level_flip_data
+    add si, bx
+    add di, R_FLIP
+    mov cx, 4
+.Lrl_copy_flip:
+    mov ax, word ptr [si]
+    mov word ptr [di], ax
+    add si, 2
+    add di, 2
+    loop .Lrl_copy_flip
 .Lrl_ret:
     ret
 
