@@ -51,4 +51,4 @@ After editing a grid, regenerate the map data from `dos/`:
     python3 tools/extract_levels_asm.py campaign_maps.txt ../Simulador/tomb_of_mask.asm src/levels.inc reference_c/src/levels.h
 
 This also refreshes the compact map strings and start/exit metadata in `Simulador/tomb_of_mask.asm`.
-On Windows, use `py -3` in place of `python3`, or run `make levels` from WSL.
+`make levels` selects `py -3` on Windows and `python3` on Linux/WSL automatically.

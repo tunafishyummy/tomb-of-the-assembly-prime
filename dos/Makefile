@@ -6,6 +6,11 @@
 #
 # Tools needed: GNU as + ld (package "binutils", 32-bit x86 support).  On Windows use WSL (see HOW_TO_RUN.md).
 AS = as --32 -march=i386 -I src
+ifeq ($(OS),Windows_NT)
+PYTHON ?= py -3
+else
+PYTHON ?= python3
+endif
 SRC = src/tomb.s src/defs.inc src/plat.inc src/gfx.inc src/engine.inc src/gen.inc src/gen_vars.inc src/ui.inc src/assets.inc src/levels.inc
 
 all: TOMB.COM
@@ -22,7 +27,7 @@ TOMB.COM: build/tomb.o src/tomb.ld
 assets:
 	python3 tools/gen_assets_asm.py src/assets.inc
 levels:
-	python3 tools/extract_levels_asm.py campaign_maps.txt ../Simulador/tomb_of_mask.asm src/levels.inc reference_c/src/levels.h
+	$(PYTHON) tools/extract_levels_asm.py campaign_maps.txt ../Simulador/tomb_of_mask.asm src/levels.inc reference_c/src/levels.h
 .PHONY: all assets levels test clean
 
 tests/x86run: tests/x86run.c
