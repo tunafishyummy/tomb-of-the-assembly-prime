@@ -1,8 +1,3 @@
-; ────┤ Practical Assignment in Computer Organization │ August 2021 ├────
-; Gabriel Victor Cardoso Fernandes - 11878296
-; Gabriel Alves Kuabara - 11275043
-; Lourenço de Salles Roselino - 11796805
-
 ; Characters that build the map
 ; player - z yellow
 ; normal wall - } blue
