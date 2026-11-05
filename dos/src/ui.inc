@@ -923,6 +923,7 @@ stage_failed_screen:
     mov dh, 2
     cmp word ptr [failed_sel], 0
     je .Lsfs_retry
+    mov si, offset str_retry_off
     mov dl, P_GREY
 .Lsfs_retry:
     call gfx_text_c
@@ -932,6 +933,7 @@ stage_failed_screen:
     mov dh, 2
     cmp word ptr [failed_sel], 1
     je .Lsfs_select
+    mov si, offset str_failed_select_off
     mov dl, P_GREY
 .Lsfs_select:
     call gfx_text_c
@@ -984,6 +986,7 @@ level_completed_screen:
     mov dh, 1
     cmp word ptr [failed_sel], 0
     je .Llcs_next
+    mov si, offset str_next_off
     mov dl, P_GREY
 .Llcs_next:
     call gfx_text_c
@@ -993,6 +996,7 @@ level_completed_screen:
     mov dh, 1
     cmp word ptr [failed_sel], 1
     je .Llcs_select
+    mov si, offset str_select_off
     mov dl, P_GREY
 .Llcs_select:
     call gfx_text_c
