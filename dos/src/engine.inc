@@ -86,6 +86,13 @@ game_restart:
     call game_reset_player
     mov ax, word ptr [g_coin_rec]
     mov word ptr [g_coins], ax
+    cmp word ptr [g_mode], MODE_ENDLESS
+    jne .Lgr_ret
+    mov ax, word ptr [room+R_H]       # the rising lava starts over with the room
+    add ax, 4
+    mov word ptr [g_lava_y], ax
+    mov word ptr [g_lava_clock], 0
+.Lgr_ret:
     ret
 
 # game_dash
@@ -206,6 +213,7 @@ begin_step:
     inc word ptr [g_coins]
     or word ptr [ev_acc], EV_COIN
     mov byte ptr [room+R_C+si], T_FLOOR
+    call sfx_coin
     mov al, 1
     ret
 .Lbs_key:
@@ -216,6 +224,7 @@ begin_step:
 .Lbs_item:
     or word ptr [ev_acc], EV_ITEM
     mov byte ptr [room+R_C+si], T_FLOOR
+    call sfx_item
     mov al, 1
     ret
 .Lbs_shield:
@@ -225,9 +234,11 @@ begin_step:
     add word ptr [g_coins], 5
     mov word ptr [g_msg], offset str_shield_bonus
     mov word ptr [g_msg_t], 150
+    call sfx_coin
     jmp .Lbs_shield_done
 .Lbs_shield_new:
     mov word ptr [g_shield], 1
+    call sfx_shield
 .Lbs_shield_done:
     mov byte ptr [room+R_C+si], T_FLOOR
     mov al, 1
@@ -238,6 +249,7 @@ begin_step:
     pop si
     mov byte ptr [room+R_C+si], T_FLOOR
     or word ptr [ev_acc], EV_ITEM
+    call sfx_lever
     mov al, 1
     ret
 .Lbs_plate:
@@ -246,6 +258,7 @@ begin_step:
     pop si
     mov byte ptr [room+R_C+si], T_FLOOR
     or word ptr [ev_acc], EV_ITEM
+    call sfx_plate
     mov al, 1
     ret
 .Lbs_door:
@@ -254,6 +267,7 @@ begin_step:
     dec word ptr [g_keys]
     mov byte ptr [room+R_C+si], T_FLOOR
     or word ptr [ev_acc], EV_ITEM
+    call sfx_door
     jmp .Lbs_stop                    # opening a door always ends the dash
 .Lbs_trap:
     cmp word ptr [g_shield], 0
@@ -266,6 +280,7 @@ begin_step:
     mov word ptr [g_shield], 0
     mov byte ptr [room+R_C+si], T_FLOOR
     or word ptr [ev_acc], EV_ITEM
+    call sfx_shield_hit
     mov al, 1
     ret
 .Lbs_crate:
@@ -300,6 +315,7 @@ begin_step:
     pop si
 .Lbs_push2:
     mov byte ptr [room+R_C+si], T_FLOOR
+    call sfx_crate
     mov al, 1
     ret
 
@@ -362,6 +378,7 @@ game_bomb:
     jg .Lgb1
     mov word ptr [g_msg], offset str_nobombs
     mov word ptr [g_msg_t], 150
+    call sfx_deny
     ret
 .Lgb1:
     xor si, si                       # direction index
@@ -396,9 +413,11 @@ game_bomb:
     jnz .Lgb_ok
     mov word ptr [g_msg], offset str_nothing
     mov word ptr [g_msg_t], 150
+    call sfx_deny
     ret
 .Lgb_ok:
     dec word ptr [g_bombs]
+    call sfx_bomb
     ret
 bomb_ox: .word 0, 0, -1, 1
 bomb_oy: .word -1, 1, 0, 0

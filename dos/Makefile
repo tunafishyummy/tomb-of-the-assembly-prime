@@ -11,7 +11,7 @@ PYTHON ?= py -3
 else
 PYTHON ?= python3
 endif
-SRC = src/tomb.s src/defs.inc src/plat.inc src/gfx.inc src/engine.inc src/gen.inc src/gen_vars.inc src/ui.inc src/assets.inc src/levels.inc
+SRC = src/tomb.s src/defs.inc src/plat.inc src/sound.inc src/opl.inc src/music.inc src/gfx.inc src/engine.inc src/gen.inc src/gen_vars.inc src/ui.inc src/assets.inc src/levels.inc
 
 all: TOMB.COM
 
@@ -25,7 +25,7 @@ TOMB.COM: build/tomb.o src/tomb.ld
 
 # data tables are generated from source; rerun assets only if sprites/font change
 assets:
-	python3 tools/gen_assets_asm.py src/assets.inc
+	$(PYTHON) tools/gen_assets_asm.py src/assets.inc
 levels:
 	$(PYTHON) tools/extract_levels_asm.py campaign_maps.txt ../Simulador/tomb_of_mask.asm src/levels.inc reference_c/src/levels.h
 .PHONY: all assets levels test clean

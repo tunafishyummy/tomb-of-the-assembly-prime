@@ -14,6 +14,8 @@
     .globl _start
 _start:
     cld
+    push ds
+    pop es                           # rep stosb below must write our segment
     mov di, offset __bss_start       # DOS does not clear memory: zero our variables
     mov cx, offset __bss_end
     sub cx, di
@@ -22,11 +24,16 @@ _start:
     call init_trail_tile
     call init_pellet_tile
     call game_main
+    call opl_note_off               # silence the music channel
+    call sfx_stop                    # never leave the PC speaker droning
     mov ax, 0x4C00                   # back to DOS
     int 0x21
 
     .text
     .include "plat.inc"
+    .include "sound.inc"
+    .include "opl.inc"
+    .include "music.inc"
     .include "gfx.inc"
     .include "engine.inc"
     .include "gen.inc"
@@ -117,9 +124,9 @@ str_set3:        .asciz "  BACK"
 str_spd0:        .asciz "SLOW  "
 str_spd1:        .asciz "NORMAL"
 str_spd2:        .asciz "FAST  "
-str_reserved:    .asciz "RESERVED"
-str_sound_note:  .asciz "SOUND IS RESERVED FOR A FUTURE UPDATE"
-str_set_hint:    .asciz "UP/DOWN MOVE  LEFT/RIGHT CHANGE  ENTER BACK"
+str_on:          .asciz "ON"
+str_off:         .asciz "OFF"
+str_set_hint:    .asciz "UP/DOWN MOVE  LEFT/RIGHT CHANGE  ESC BACK"
 str_legend:      .asciz "ICON LEGEND"
 str_anykey:      .asciz "ANY KEY TO RETURN"
 str_rooms:       .asciz "ROOMS CLEARED:"
@@ -296,7 +303,12 @@ m_key:      .space 2
 stage_sel:  .space 2
 stage_col:  .space 2
 stage_row:  .space 2
-s_note:     .space 2
+sfx_on:     .space 2
+sfx_ptr:    .space 2
+sfx_timer:  .space 2
+mus_on:     .space 2
+mus_ptr:    .space 2
+mus_timer:  .space 2
 hs_x:       .space 2
 hs_y:       .space 2
 e_rooms:    .space 2

@@ -1,0 +1,12 @@
+# Build artifacts
+dos/build/
+dos/capture/
+*.o
+*.pyc
+__pycache__/
+
+# Editor / OS noise
+*.swp
+*.swo
+Thumbs.db
+desktop.ini

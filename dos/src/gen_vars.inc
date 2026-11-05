@@ -80,6 +80,17 @@ dc_off:     .space 2
 dc_k:       .space 2
 dc_x:       .space 2
 dc_y:       .space 2
+kb_key:     .space 2
+kb_plate:   .space 2
+kb_lever:   .space 2
+kb_bomb:    .space 2
+kb_crate:   .space 2
+kb_tile:    .space 2
+kb_save:    .space 6
+kb_tmp:     .space 2
+kb_p:       .space 2
+kb_c:       .space 2
+kb_t:       .space 2
 seen:       .space 192               # MAXNX*MAXNY
 lstack:     .space 384               # 192 words
 gdist:      .space MAXCELLS
