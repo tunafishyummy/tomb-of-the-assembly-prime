@@ -910,111 +910,743 @@ decorate:
 .Ldc_ret:
     ret
 
+# place_key_bomb: add the exit lock and the optional puzzle items.
+# The exit corridor gets a door, a gate and a toggle wall, so the key, plate
+# and lever all lead to the exit.  The key, plate, lever and bomb stay in the
+# main room so they can be collected before the climb.
 place_key_bomb:
     mov bp, word ptr [gp_r]
     mov ax, word ptr [bp+R_SY]
     imul ax, word ptr [bp+R_W]
     add ax, word ptr [bp+R_SX]
     mov word ptr [dc_st], ax
-    mov ax, word ptr [bp+R_EY]
-    imul ax, word ptr [bp+R_W]
-    add ax, word ptr [bp+R_EX]
-    mov word ptr [dc_len], ax
     mov ax, word ptr [bp+R_W]
     imul ax, word ptr [bp+R_H]
     mov word ptr [dc_run], ax
-    mov word ptr [dc_placed], 0
+    mov word ptr [kb_key], 0xFFFF
+    mov word ptr [kb_plate], 0xFFFF
+    mov word ptr [kb_lever], 0xFFFF
+    mov word ptr [kb_bomb], 0xFFFF
+    mov word ptr [kb_crate], 0xFFFF
+    mov word ptr [bp+R_NFLIP], 0
+    cmp word ptr [bp+R_EY], 0
+    jne .Lpkb_abort
+    cmp word ptr [bp+R_H], 5
+    jl .Lpkb_abort
+
+    # Clear the five-cell exit corridor so traps or pickups cannot sit in it.
+    mov cx, 1
+.Lpkb_clear:
+    cmp cx, 5
+    jge .Lpkb_clear_done
+    mov ax, cx
+    imul ax, word ptr [bp+R_W]
+    add ax, word ptr [bp+R_EX]
+    mov di, ax
+    mov byte ptr [bp+di+R_C], T_FLOOR
+    inc cx
+    jmp .Lpkb_clear
+.Lpkb_clear_done:
+
+    # Seal the sides of the three lock cells.  The only entrance is the bottom
+    # cell (ex,4), so the player can never stand between two locks or enter
+    # beside the gate.
+    mov cx, 1
+.Lpkb_seal:
+    cmp cx, 4
+    jge .Lpkb_seal_done
+    mov ax, cx
+    imul ax, word ptr [bp+R_W]
+    add ax, word ptr [bp+R_EX]
+    mov di, ax
+    dec di
+    mov bx, cx
+    dec bx
+    shl bx, 1
+    mov al, byte ptr [bp+di+R_C]
+    mov byte ptr [kb_save+bx], al
+    mov byte ptr [bp+di+R_C], T_WALL
+    mov ax, cx
+    imul ax, word ptr [bp+R_W]
+    add ax, word ptr [bp+R_EX]
+    mov di, ax
+    inc di
+    mov al, byte ptr [bp+di+R_C]
+    mov byte ptr [kb_save+bx+1], al
+    mov byte ptr [bp+di+R_C], T_WALL
+    inc cx
+    jmp .Lpkb_seal
+.Lpkb_seal_done:
+    call room_solve
+    test ax, ax
+    js .Lpkb_seal_fail
+    cmp word ptr [sv_str], 0
+    jne .Lpkb_seal_fail
+    jmp .Lpkb_seal_ok
+.Lpkb_seal_fail:
+    mov cx, 1
+.Lpkb_unseal:
+    cmp cx, 4
+    jge .Lpkb_unseal_done
+    mov ax, cx
+    imul ax, word ptr [bp+R_W]
+    add ax, word ptr [bp+R_EX]
+    mov di, ax
+    dec di
+    mov bx, cx
+    dec bx
+    shl bx, 1
+    mov al, byte ptr [kb_save+bx]
+    mov byte ptr [bp+di+R_C], al
+    mov ax, cx
+    imul ax, word ptr [bp+R_W]
+    add ax, word ptr [bp+R_EX]
+    mov di, ax
+    inc di
+    mov al, byte ptr [kb_save+bx+1]
+    mov byte ptr [bp+di+R_C], al
+    inc cx
+    jmp .Lpkb_unseal
+.Lpkb_unseal_done:
+    call room_solve
+    xor ax, ax
+    ret
+.Lpkb_seal_ok:
+
+    mov al, T_KEY
+    call pkb_find_item
+    mov word ptr [kb_key], ax
+    cmp ax, 0xFFFF
+    je .Lpkb_abort
+    mov al, T_PLATE
+    call pkb_find_item
+    mov word ptr [kb_plate], ax
+    cmp ax, 0xFFFF
+    je .Lpkb_abort
+    mov al, T_LEVER
+    call pkb_find_item
+    mov word ptr [kb_lever], ax
+    cmp ax, 0xFFFF
+    je .Lpkb_abort
+    mov al, T_BOMB
+    call pkb_find_item
+    mov word ptr [kb_bomb], ax
+
+    # The crate alcove experiment is disabled: it made the self-test hang.
+    # The exit lock and side-wall validation below are the tested path.
+    # call pkb_carve_crate
+
+    # The key/door, plate/gate and lever/toggle form three layers directly
+    # under the exit.  The player enters the shaft only from (ex,4).
+    mov ax, word ptr [bp+R_W]
+    add ax, word ptr [bp+R_EX]
+    mov di, ax
+    mov byte ptr [bp+di+R_C], T_DOOR
+    mov ax, word ptr [bp+R_W]
+    shl ax, 1
+    add ax, word ptr [bp+R_EX]
+    mov di, ax
+    mov byte ptr [bp+di+R_C], T_GATE
+    mov ax, word ptr [bp+R_W]
+    imul ax, ax, 3
+    add ax, word ptr [bp+R_EX]
+    mov di, ax
+    mov byte ptr [bp+di+R_C], T_TOGGLE
+    mov word ptr [bp+R_NFLIP], 1
+    mov word ptr [bp+R_FLIP], di
+    mov ax, 1
+    ret
+.Lpkb_abort:
+    xor ax, ax
+    ret
+
+# pkb_find_item: AL = tile, returns AX = cell index or 0xFFFF.
+# Only reachable floor cells outside the exit column are used.
+pkb_find_item:
+    mov byte ptr [kb_tile], al
     xor si, si
-.Lpkb_loop:
+.Lpfi_loop:
     cmp si, word ptr [dc_run]
-    jge .Lpkb_done
+    jge .Lpfi_none
     cmp si, word ptr [dc_st]
-    je .Lpkb_next
-    cmp si, word ptr [dc_len]
-    je .Lpkb_next
+    je .Lpfi_next
     cmp byte ptr [bp+si+R_C], T_FLOOR
-    jne .Lpkb_next
-    # Ignore unreachable floor cells.
+    jne .Lpfi_next
     cmp byte ptr [gdist+si], 255
-    je .Lpkb_next
-    mov ax, word ptr [dc_placed]
-    cmp ax, 0
-    je .Lpkb_key
-    cmp ax, 1
-    je .Lpkb_door
-    cmp ax, 2
-    je .Lpkb_bomb
-    cmp ax, 3
-    je .Lpkb_crate
-    jmp .Lpkb_done
-.Lpkb_key:
-    mov byte ptr [bp+si+R_C], T_KEY
-    movzx ax, byte ptr [gdist+si]
-    mov word ptr [dc_off], ax
-    inc word ptr [dc_placed]
-    jmp .Lpkb_next
-.Lpkb_door:
-    movzx ax, byte ptr [gdist+si]
-    cmp ax, word ptr [dc_off]
-    jle .Lpkb_next
-    mov byte ptr [bp+si+R_C], T_DOOR
-    inc word ptr [dc_placed]
-    jmp .Lpkb_next
-.Lpkb_bomb:
-    mov byte ptr [bp+si+R_C], T_BOMB
-    inc word ptr [dc_placed]
-    jmp .Lpkb_next
-.Lpkb_crate:
-    # Only put a crate in a roomy spot so it is less likely to seal a corridor.
+    je .Lpfi_next
+    mov ax, si
+    xor dx, dx
+    div word ptr [bp+R_W]
+    cmp dx, word ptr [bp+R_EX]
+    je .Lpfi_next
+    mov al, byte ptr [kb_tile]
+    mov byte ptr [bp+si+R_C], al
+    mov ax, si
+    ret
+.Lpfi_next:
+    inc si
+    jmp .Lpfi_loop
+.Lpfi_none:
+    mov ax, 0xFFFF
+    ret
+
+# pkb_safe_crate: put a crate in a one-cell side alcove.  The crate can only be
+# pushed into the dead end, never back across the main path, so it cannot seal
+# the room.
+pkb_safe_crate:
+    xor si, si
+.Lpsc_loop:
+    cmp si, word ptr [dc_run]
+    jge .Lpsc_ret
+    cmp si, word ptr [dc_st]
+    je .Lpsc_next
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    jne .Lpsc_next
+    cmp byte ptr [gdist+si], 255
+    je .Lpsc_next
     mov ax, si
     xor dx, dx
     div word ptr [bp+R_W]
     mov word ptr [dc_y], ax
     mov word ptr [dc_x], dx
-    mov ax, dx
-    dec ax
-    cmp ax, 0
-    jl .Lpkb_next
-    mov bx, word ptr [dc_y]
-    imul bx, word ptr [bp+R_W]
-    add bx, ax
+    cmp dx, word ptr [bp+R_EX]
+    je .Lpsc_next
+    call pkb_degree
+    cmp ax, 2
+    jne .Lpsc_next
+
+    mov di, 0xFFFF
+    mov bx, si
+    mov ax, word ptr [dc_x]
+    test ax, ax
+    jz .Lpsc_tip_left_done
+    dec bx
+    call pkb_is_tip
+    test ax, ax
+    jz .Lpsc_tip_left_done
     mov di, bx
-    cmp byte ptr [bp+di+R_C], T_FLOOR
-    jne .Lpkb_next
+.Lpsc_tip_left_done:
+    mov bx, si
     mov ax, word ptr [dc_x]
     inc ax
     cmp ax, word ptr [bp+R_W]
-    jge .Lpkb_next
-    mov bx, word ptr [dc_y]
-    imul bx, word ptr [bp+R_W]
-    add bx, ax
+    jge .Lpsc_tip_right_done
+    inc bx
+    call pkb_is_tip
+    test ax, ax
+    jz .Lpsc_tip_right_done
     mov di, bx
-    cmp byte ptr [bp+di+R_C], T_FLOOR
-    jne .Lpkb_next
+.Lpsc_tip_right_done:
+    mov bx, si
     mov ax, word ptr [dc_y]
-    dec ax
-    cmp ax, 0
-    jl .Lpkb_next
-    imul ax, word ptr [bp+R_W]
-    add ax, word ptr [dc_x]
-    mov di, ax
-    cmp byte ptr [bp+di+R_C], T_FLOOR
-    jne .Lpkb_next
+    test ax, ax
+    jz .Lpsc_tip_up_done
+    sub bx, word ptr [bp+R_W]
+    call pkb_is_tip
+    test ax, ax
+    jz .Lpsc_tip_up_done
+    mov di, bx
+.Lpsc_tip_up_done:
+    mov bx, si
     mov ax, word ptr [dc_y]
     inc ax
     cmp ax, word ptr [bp+R_H]
-    jge .Lpkb_next
-    imul ax, word ptr [bp+R_W]
-    add ax, word ptr [dc_x]
-    mov di, ax
-    cmp byte ptr [bp+di+R_C], T_FLOOR
-    jne .Lpkb_next
+    jge .Lpsc_tip_down_done
+    add bx, word ptr [bp+R_W]
+    call pkb_is_tip
+    test ax, ax
+    jz .Lpsc_tip_down_done
+    mov di, bx
+.Lpsc_tip_down_done:
+    cmp di, 0xFFFF
+    je .Lpsc_next
+
+    # The other floor neighbour is the path side; it must be a through cell.
+    mov bx, si
+    mov ax, word ptr [dc_x]
+    test ax, ax
+    jz .Lpsc_path_left_done
+    dec bx
+    cmp bx, di
+    je .Lpsc_path_left_done
+    push si
+    mov si, bx
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    pop si
+    jne .Lpsc_path_left_done
+    push si
+    mov si, bx
+    call pkb_degree
+    pop si
+    cmp ax, 2
+    jge .Lpsc_place
+.Lpsc_path_left_done:
+    mov bx, si
+    mov ax, word ptr [dc_x]
+    inc ax
+    cmp ax, word ptr [bp+R_W]
+    jge .Lpsc_path_right_done
+    inc bx
+    cmp bx, di
+    je .Lpsc_path_right_done
+    push si
+    mov si, bx
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    pop si
+    jne .Lpsc_path_right_done
+    push si
+    mov si, bx
+    call pkb_degree
+    pop si
+    cmp ax, 2
+    jge .Lpsc_place
+.Lpsc_path_right_done:
+    mov bx, si
+    mov ax, word ptr [dc_y]
+    test ax, ax
+    jz .Lpsc_path_up_done
+    sub bx, word ptr [bp+R_W]
+    cmp bx, di
+    je .Lpsc_path_up_done
+    push si
+    mov si, bx
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    pop si
+    jne .Lpsc_path_up_done
+    push si
+    mov si, bx
+    call pkb_degree
+    pop si
+    cmp ax, 2
+    jge .Lpsc_place
+.Lpsc_path_up_done:
+    mov bx, si
+    mov ax, word ptr [dc_y]
+    inc ax
+    cmp ax, word ptr [bp+R_H]
+    jge .Lpsc_path_down_done
+    add bx, word ptr [bp+R_W]
+    cmp bx, di
+    je .Lpsc_path_down_done
+    push si
+    mov si, bx
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    pop si
+    jne .Lpsc_path_down_done
+    push si
+    mov si, bx
+    call pkb_degree
+    pop si
+    cmp ax, 2
+    jge .Lpsc_place
+.Lpsc_path_down_done:
+    jmp .Lpsc_next
+.Lpsc_place:
     mov byte ptr [bp+si+R_C], T_CRATE
-    jmp .Lpkb_done
-.Lpkb_next:
+    mov word ptr [kb_crate], si
+    ret
+.Lpsc_next:
     inc si
-    jmp .Lpkb_loop
-.Lpkb_done:
+    jmp .Lpsc_loop
+.Lpsc_ret:
+    ret
+
+# pkb_is_tip: BX = neighbour, returns AX = 1 when it is a reachable one-cell
+# dead end that is not the start and not in the exit column.
+pkb_is_tip:
+    push si
+    mov si, bx
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    jne .Lpit_no
+    cmp si, word ptr [dc_st]
+    je .Lpit_no
+    mov ax, si
+    xor dx, dx
+    div word ptr [bp+R_W]
+    cmp dx, word ptr [bp+R_EX]
+    je .Lpit_no
+    call pkb_degree
+    cmp ax, 1
+    jne .Lpit_no
+    mov ax, 1
+    pop si
+    ret
+.Lpit_no:
+    xor ax, ax
+    pop si
+    ret
+
+# pkb_degree: SI = cell, returns AX = number of floor neighbours.
+pkb_degree:
+    push bx
+    push cx
+    push dx
+    push di
+    mov word ptr [kb_tmp], si
+    mov ax, si
+    xor dx, dx
+    div word ptr [bp+R_W]
+    mov cx, ax
+    mov bx, dx
+    xor di, di
+    test bx, bx
+    jz .Lpd_left_done
+    mov si, word ptr [kb_tmp]
+    dec si
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    jne .Lpd_left_done
+    inc di
+.Lpd_left_done:
+    mov ax, bx
+    inc ax
+    cmp ax, word ptr [bp+R_W]
+    jge .Lpd_right_done
+    mov si, word ptr [kb_tmp]
+    inc si
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    jne .Lpd_right_done
+    inc di
+.Lpd_right_done:
+    test cx, cx
+    jz .Lpd_up_done
+    mov si, word ptr [kb_tmp]
+    sub si, word ptr [bp+R_W]
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    jne .Lpd_up_done
+    inc di
+.Lpd_up_done:
+    mov ax, cx
+    inc ax
+    cmp ax, word ptr [bp+R_H]
+    jge .Lpd_down_done
+    mov si, word ptr [kb_tmp]
+    add si, word ptr [bp+R_W]
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    jne .Lpd_down_done
+    inc di
+.Lpd_down_done:
+    mov si, word ptr [kb_tmp]
+    mov ax, di
+    pop di
+    pop dx
+    pop cx
+    pop bx
+    ret
+
+# pkb_safe_crate2: a crate in a straight alcove whose two floor neighbours are
+# opposite.  One neighbour is the path, the other is a dead end, so the crate
+# can only be pushed into the dead end and can never block the path.
+pkb_safe_crate2:
+    xor si, si
+.Lpsc2_loop:
+    cmp si, word ptr [dc_run]
+    jge .Lpsc2_ret
+    cmp si, word ptr [dc_st]
+    je .Lpsc2_next
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    jne .Lpsc2_next
+    cmp byte ptr [gdist+si], 255
+    je .Lpsc2_next
+    mov ax, si
+    xor dx, dx
+    div word ptr [bp+R_W]
+    mov word ptr [dc_y], ax
+    mov word ptr [dc_x], dx
+    cmp dx, word ptr [bp+R_EX]
+    je .Lpsc2_next
+    call pkb_degree
+    cmp ax, 2
+    jne .Lpsc2_next
+
+    mov ax, word ptr [dc_x]
+    test ax, ax
+    jz .Lpsc2_vertical
+    inc ax
+    cmp ax, word ptr [bp+R_W]
+    jge .Lpsc2_vertical
+    mov bx, si
+    dec bx
+    call pkb_is_tip
+    test ax, ax
+    jz .Lpsc2_h_right_tip
+    mov bx, si
+    inc bx
+    call pkb_is_path
+    test ax, ax
+    jnz .Lpsc2_place
+    jmp .Lpsc2_vertical
+.Lpsc2_h_right_tip:
+    mov bx, si
+    inc bx
+    call pkb_is_tip
+    test ax, ax
+    jz .Lpsc2_vertical
+    mov bx, si
+    dec bx
+    call pkb_is_path
+    test ax, ax
+    jnz .Lpsc2_place
+.Lpsc2_vertical:
+    mov ax, word ptr [dc_y]
+    test ax, ax
+    jz .Lpsc2_next
+    inc ax
+    cmp ax, word ptr [bp+R_H]
+    jge .Lpsc2_next
+    mov bx, si
+    sub bx, word ptr [bp+R_W]
+    call pkb_is_tip
+    test ax, ax
+    jz .Lpsc2_v_down_tip
+    mov bx, si
+    add bx, word ptr [bp+R_W]
+    call pkb_is_path
+    test ax, ax
+    jnz .Lpsc2_place
+    jmp .Lpsc2_next
+.Lpsc2_v_down_tip:
+    mov bx, si
+    add bx, word ptr [bp+R_W]
+    call pkb_is_tip
+    test ax, ax
+    jz .Lpsc2_next
+    mov bx, si
+    sub bx, word ptr [bp+R_W]
+    call pkb_is_path
+    test ax, ax
+    jnz .Lpsc2_place
+.Lpsc2_next:
+    inc si
+    jmp .Lpsc2_loop
+.Lpsc2_place:
+    mov byte ptr [bp+si+R_C], T_CRATE
+    ret
+.Lpsc2_ret:
+    ret
+
+# pkb_is_path: BX = neighbour, AX = 1 when it is a floor through cell.
+pkb_is_path:
+    push si
+    mov si, bx
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    jne .Lpip_no
+    call pkb_degree
+    cmp ax, 2
+    jl .Lpip_no
+    mov ax, 1
+    pop si
+    ret
+.Lpip_no:
+    xor ax, ax
+    pop si
+    ret
+
+# pkb_carve_crate: carve a two-cell wall pocket beside a reachable floor cell
+# and put a crate in the first cell.  The sides and the far end are walls, so
+# the crate can only be pushed into the dead end and never across the path.
+pkb_carve_crate:
+    xor si, si
+.Lpcc_loop:
+    cmp si, word ptr [dc_run]
+    jge .Lpcc_ret
+    cmp si, word ptr [dc_st]
+    je .Lpcc_next
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    jne .Lpcc_next
+    cmp byte ptr [gdist+si], 255
+    je .Lpcc_next
+    mov word ptr [kb_p], si
+    mov ax, si
+    xor dx, dx
+    div word ptr [bp+R_W]
+    mov word ptr [dc_y], ax
+    mov word ptr [dc_x], dx
+
+    cmp word ptr [dc_x], 3
+    jl .Lpcc_right
+    cmp word ptr [dc_y], 5
+    jl .Lpcc_right
+    mov ax, word ptr [bp+R_H]
+    dec ax
+    cmp word ptr [dc_y], ax
+    jg .Lpcc_right
+    mov ax, word ptr [dc_x]
+    dec ax
+    cmp ax, word ptr [bp+R_EX]
+    je .Lpcc_right
+    dec ax
+    cmp ax, word ptr [bp+R_EX]
+    je .Lpcc_right
+    mov si, word ptr [kb_p]
+    dec si
+    mov word ptr [kb_c], si
+    cmp byte ptr [bp+si+R_C], T_WALL
+    jne .Lpcc_right
+    dec si
+    mov word ptr [kb_t], si
+    cmp byte ptr [bp+si+R_C], T_WALL
+    jne .Lpcc_right
+    mov si, word ptr [kb_c]
+    sub si, word ptr [bp+R_W]
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    je .Lpcc_right
+    mov si, word ptr [kb_c]
+    add si, word ptr [bp+R_W]
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    je .Lpcc_right
+    mov si, word ptr [kb_t]
+    sub si, word ptr [bp+R_W]
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    je .Lpcc_right
+    mov si, word ptr [kb_t]
+    add si, word ptr [bp+R_W]
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    je .Lpcc_right
+    mov si, word ptr [kb_t]
+    dec si
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    je .Lpcc_right
+    jmp .Lpcc_place
+
+.Lpcc_right:
+    mov ax, word ptr [bp+R_W]
+    sub ax, 4
+    cmp word ptr [dc_x], ax
+    jg .Lpcc_vertical
+    cmp word ptr [dc_y], 5
+    jl .Lpcc_vertical
+    mov ax, word ptr [bp+R_H]
+    dec ax
+    cmp word ptr [dc_y], ax
+    jg .Lpcc_vertical
+    mov ax, word ptr [dc_x]
+    inc ax
+    cmp ax, word ptr [bp+R_EX]
+    je .Lpcc_vertical
+    inc ax
+    cmp ax, word ptr [bp+R_EX]
+    je .Lpcc_vertical
+    mov si, word ptr [kb_p]
+    inc si
+    mov word ptr [kb_c], si
+    cmp byte ptr [bp+si+R_C], T_WALL
+    jne .Lpcc_vertical
+    inc si
+    mov word ptr [kb_t], si
+    cmp byte ptr [bp+si+R_C], T_WALL
+    jne .Lpcc_vertical
+    mov si, word ptr [kb_c]
+    sub si, word ptr [bp+R_W]
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    je .Lpcc_vertical
+    mov si, word ptr [kb_c]
+    add si, word ptr [bp+R_W]
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    je .Lpcc_vertical
+    mov si, word ptr [kb_t]
+    sub si, word ptr [bp+R_W]
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    je .Lpcc_vertical
+    mov si, word ptr [kb_t]
+    add si, word ptr [bp+R_W]
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    je .Lpcc_vertical
+    mov si, word ptr [kb_t]
+    inc si
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    je .Lpcc_vertical
+    jmp .Lpcc_place
+
+.Lpcc_vertical:
+    cmp word ptr [dc_y], 7
+    jl .Lpcc_down
+    mov ax, word ptr [dc_x]
+    cmp ax, word ptr [bp+R_EX]
+    je .Lpcc_down
+    mov si, word ptr [kb_p]
+    sub si, word ptr [bp+R_W]
+    mov word ptr [kb_c], si
+    cmp byte ptr [bp+si+R_C], T_WALL
+    jne .Lpcc_down
+    sub si, word ptr [bp+R_W]
+    mov word ptr [kb_t], si
+    cmp byte ptr [bp+si+R_C], T_WALL
+    jne .Lpcc_down
+    mov si, word ptr [kb_c]
+    dec si
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    je .Lpcc_down
+    mov si, word ptr [kb_c]
+    inc si
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    je .Lpcc_down
+    mov si, word ptr [kb_t]
+    dec si
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    je .Lpcc_down
+    mov si, word ptr [kb_t]
+    inc si
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    je .Lpcc_down
+    mov si, word ptr [kb_t]
+    sub si, word ptr [bp+R_W]
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    je .Lpcc_down
+    jmp .Lpcc_place
+
+.Lpcc_down:
+    mov ax, word ptr [bp+R_H]
+    sub ax, 4
+    cmp word ptr [dc_y], ax
+    jg .Lpcc_next
+    cmp word ptr [dc_y], 4
+    jl .Lpcc_next
+    mov ax, word ptr [dc_x]
+    cmp ax, word ptr [bp+R_EX]
+    je .Lpcc_next
+    mov si, word ptr [kb_p]
+    add si, word ptr [bp+R_W]
+    mov word ptr [kb_c], si
+    cmp byte ptr [bp+si+R_C], T_WALL
+    jne .Lpcc_next
+    add si, word ptr [bp+R_W]
+    mov word ptr [kb_t], si
+    cmp byte ptr [bp+si+R_C], T_WALL
+    jne .Lpcc_next
+    mov si, word ptr [kb_c]
+    dec si
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    je .Lpcc_next
+    mov si, word ptr [kb_c]
+    inc si
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    je .Lpcc_next
+    mov si, word ptr [kb_t]
+    dec si
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    je .Lpcc_next
+    mov si, word ptr [kb_t]
+    inc si
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    je .Lpcc_next
+    mov si, word ptr [kb_t]
+    add si, word ptr [bp+R_W]
+    cmp byte ptr [bp+si+R_C], T_FLOOR
+    je .Lpcc_next
+
+.Lpcc_place:
+    mov si, word ptr [kb_c]
+    mov byte ptr [bp+si+R_C], T_FLOOR
+    mov si, word ptr [kb_t]
+    mov byte ptr [bp+si+R_C], T_FLOOR
+    mov si, word ptr [kb_c]
+    mov byte ptr [bp+si+R_C], T_CRATE
+    ret
+.Lpcc_next:
+    mov si, word ptr [kb_p]
+    inc si
+    jmp .Lpcc_loop
+.Lpcc_ret:
     ret
 
 # gen_room
@@ -1150,6 +1782,8 @@ gen_room:
     mov ax, word ptr [gd_depth]
     call decorate
     call place_key_bomb
+    test ax, ax
+    jz .Lgen_next
     ret
 .Lgen_next:
     inc word ptr [g_attempt]
