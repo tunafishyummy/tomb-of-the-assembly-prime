@@ -1,6 +1,6 @@
 # Tomb of the Assembly - DOS edition (pure x86 assembly)
 #
-#   make          assemble + link  ->  TOMB.COM
+#   make          regenerate maps, assemble + link  ->  TOMB.COM
 #   make test     compare against the reference build (needs python3 and gcc)
 #   make clean
 #
@@ -10,7 +10,7 @@ SRC = src/tomb.s src/defs.inc src/plat.inc src/gfx.inc src/engine.inc src/gen.in
 
 all: TOMB.COM
 
-build/tomb.o: $(SRC)
+build/tomb.o: $(SRC) levels
 	@mkdir -p build
 	$(AS) src/tomb.s -o build/tomb.o
 
@@ -18,11 +18,12 @@ TOMB.COM: build/tomb.o src/tomb.ld
 	ld -m elf_i386 -T src/tomb.ld -o $@ build/tomb.o
 	@echo "TOMB.COM = $$(stat -c %s $@) bytes"
 
-# data tables are generated once and committed; rerun these only if you change sprites/font/levels
+# data tables are generated from source; rerun assets only if sprites/font change
 assets:
 	python3 tools/gen_assets_asm.py src/assets.inc
 levels:
 	python3 tools/extract_levels_asm.py ../Simulador/tomb_of_mask.asm src/levels.inc reference_c/src/levels.h
+.PHONY: all assets levels test clean
 
 tests/x86run: tests/x86run.c
 	gcc -O2 -Wno-unused -o $@ $<
