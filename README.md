@@ -40,7 +40,7 @@ If `RUN.BAT` says **"DOSBox not found"**, use Part 2 below instead.
 Menu: use **W/S** or **Up/Down** to choose, **Enter** to start.
 * **NORMAL MODE** - the 5 original levels.
 * **ENDLESS MODE** - generated tombs that get bigger. Touching a trap ends the run (a shield saves you once).
-* **SETTINGS** - dash speed (slow / normal / fast).
+* **SETTINGS** - dash speed (slow / normal / fast), SOUND FX, and GAME MUSIC on or off.
 
 To quit: go to the title menu and press **Esc**. The DOSBox window then closes.
 
@@ -120,4 +120,7 @@ in Intel syntax. The output is a flat DOS `.COM` file.
 | `src/engine.inc` | game rules: dash, coins, keys, doors, crates, plates, levers, bombs, shield, traps |
 | `src/gen.inc` | endless room generator + solver |
 | `src/ui.inc` | menus, camera, room-change scroll, main loop |
+| `src/sound.inc` | PC speaker sound effects |
+| `src/opl.inc` | AdLib/OPL2 music channel |
+| `src/music.inc` | looping game theme |
 | `src/assets.inc`, `src/levels.inc` | generated data tables (sprites, font, palette, the 5 levels) |

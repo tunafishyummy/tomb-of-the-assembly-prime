@@ -6,7 +6,7 @@
     .equ EDGE_EXIT, 255
     .text
 
-# gfill
+gfill:
     mov word ptr [f_x0], ax
     mov word ptr [f_y0], bx
     mov word ptr [f_x1], cx
@@ -37,7 +37,7 @@
 .Lgf_done:
     ret
 
-# glink
+glink:
     imul ax, ax, 3
     inc ax
     imul bx, bx, 3
@@ -910,7 +910,7 @@ decorate:
 .Ldc_ret:
     ret
 
-#puzzle items
+place_key_bomb:
     mov bp, word ptr [gp_r]
     mov ax, word ptr [bp+R_SY]
     imul ax, word ptr [bp+R_W]

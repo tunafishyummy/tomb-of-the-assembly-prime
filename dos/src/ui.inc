@@ -57,6 +57,7 @@ tick:
     mov byte ptr [gfx_dirty], 0
 .Lt1:
     inc word ptr [frame]
+    call sound_tick
     ret
 
 invalidate:
@@ -508,15 +509,18 @@ menu_screen:
     mov cx, 3
     div cx
     mov word ptr [m_sel], dx
+    call sfx_menu_move
     jmp .Lm_loop
 .Lm_k2:
     cmp word ptr [m_key], K_ENTER
     jne .Lm_k3
+    call sfx_menu_ok
     mov ax, word ptr [m_sel]
     ret
 .Lm_k3:
     cmp word ptr [m_key], K_ESC
     jne .Lm_loop
+    call sfx_back
     mov ax, -1
     ret
 
@@ -654,23 +658,57 @@ stage_select:
 .Lss_set:
     mov word ptr [stage_sel], ax
     mov word ptr [m_redraw], 1
+    call sfx_menu_move
     jmp .Lss_loop
 .Lss_enter:
     cmp word ptr [m_key], K_ENTER
     jne .Lss_esc
+    call sfx_menu_ok
     mov ax, word ptr [stage_sel]
     ret
 .Lss_esc:
     cmp word ptr [m_key], K_ESC
     jne .Lss_loop
+    call sfx_back
     mov ax, -1
+    ret
+
+# settings_toggle_sfx: flip SOUND FX, silencing or testing the speaker.
+settings_toggle_sfx:
+    push ax
+    cmp word ptr [sfx_on], 0
+    je .Lstsfx_on
+    mov word ptr [sfx_on], 0
+    call sfx_stop
+    pop ax
+    ret
+.Lstsfx_on:
+    mov word ptr [sfx_on], 1
+    call sfx_menu_ok
+    pop ax
+    ret
+
+# settings_toggle_music: flip the OPL2 music channel.
+settings_toggle_music:
+    push ax
+    cmp word ptr [mus_on], 0
+    je .Lstm_on
+    mov word ptr [mus_on], 0
+    call opl_note_off
+    pop ax
+    ret
+.Lstm_on:
+    mov word ptr [mus_on], 1
+    mov word ptr [mus_ptr], offset mus_theme
+    mov word ptr [mus_timer], 0
+    call opl_note_off
+    pop ax
     ret
 
 # settings_screen
 settings_screen:
     mov word ptr [m_sel], 0
     mov word ptr [m_redraw], 1
-    mov word ptr [s_note], offset str_empty
     call plat_flush_keys
 .Ls_loop:
     cmp word ptr [m_redraw], 0
@@ -711,25 +749,30 @@ settings_screen:
     mov dl, P_YELLOW
     mov dh, 1
     call gfx_text
-    mov si, offset str_reserved
+    mov si, offset str_off
+    mov dl, P_GREY
+    cmp word ptr [sfx_on], 0
+    je .Ls_sfx_value
+    mov si, offset str_on
+    mov dl, P_GREEN_HI
+.Ls_sfx_value:
     mov bx, 230
-    mov cx, 94
-    mov dl, P_GREY_LO
+    mov cx, 90
     mov dh, 1
     call gfx_text
-    mov si, offset str_reserved
+    mov si, offset str_off
+    mov dl, P_GREY
+    cmp word ptr [mus_on], 0
+    je .Ls_music_value
+    mov si, offset str_on
+    mov dl, P_GREEN_HI
+.Ls_music_value:
     mov bx, 230
-    mov cx, 114
-    mov dl, P_GREY_LO
+    mov cx, 110
     mov dh, 1
     call gfx_text
-    mov si, word ptr [s_note]
-    mov cx, 160
-    mov dl, P_AQUA
-    mov dh, 1
-    call gfx_text_c
     mov si, offset str_set_hint
-    mov cx, 162
+    mov cx, 166
     mov dl, P_GREY
     mov dh, 1
     call gfx_text_c
@@ -740,7 +783,6 @@ settings_screen:
     jz .Ls_loop
     mov word ptr [m_redraw], 1
     mov word ptr [m_key], ax
-    mov word ptr [s_note], offset str_empty
     call is_up
     test dl, dl
     jz .Ls_k1
@@ -759,14 +801,16 @@ settings_screen:
     mov cx, 4
     div cx
     mov word ptr [m_sel], dx
+    call sfx_menu_move
     jmp .Ls_loop
 .Ls_k2:
     cmp word ptr [m_key], K_ESC
     jne .Ls_k3
+    call sfx_back
     ret
 .Ls_k3:
     cmp word ptr [m_sel], 0
-    jne .Ls_k5
+    jne .Ls_sound_row
     mov ax, word ptr [m_key]
     call is_left
     test dl, dl
@@ -786,6 +830,37 @@ settings_screen:
     mov cx, 3
     div cx
     mov word ptr [speed_idx], dx
+    call sfx_menu_move
+    jmp .Ls_loop
+.Ls_sound_row:
+    cmp word ptr [m_sel], 1
+    jne .Ls_music_row
+    mov ax, word ptr [m_key]
+    call is_left
+    test dl, dl
+    jnz .Ls_toggle_sfx
+    mov ax, word ptr [m_key]
+    call is_right
+    test dl, dl
+    jnz .Ls_toggle_sfx
+    jmp .Ls_k5
+.Ls_music_row:
+    cmp word ptr [m_sel], 2
+    jne .Ls_k5
+    mov ax, word ptr [m_key]
+    call is_left
+    test dl, dl
+    jnz .Ls_toggle_music
+    mov ax, word ptr [m_key]
+    call is_right
+    test dl, dl
+    jnz .Ls_toggle_music
+    jmp .Ls_k5
+.Ls_toggle_sfx:
+    call settings_toggle_sfx
+    jmp .Ls_loop
+.Ls_toggle_music:
+    call settings_toggle_music
     jmp .Ls_loop
 .Ls_k5:
     cmp word ptr [m_key], K_ENTER
@@ -798,14 +873,21 @@ settings_screen:
     mov cx, 3
     div cx
     mov word ptr [speed_idx], dx
+    call sfx_menu_move
     jmp .Ls_loop
 .Ls_e1:
-    cmp word ptr [m_sel], 3
+    cmp word ptr [m_sel], 1
     jne .Ls_e2
-    ret
-.Ls_e2:
-    mov word ptr [s_note], offset str_sound_note
+    call settings_toggle_sfx
     jmp .Ls_loop
+.Ls_e2:
+    cmp word ptr [m_sel], 2
+    jne .Ls_e3
+    call settings_toggle_music
+    jmp .Ls_loop
+.Ls_e3:
+    call sfx_back
+    ret
 
 # help_screen: icon legend
 help_screen:
@@ -854,6 +936,7 @@ help_screen:
     call gfx_text_c
     call plat_present
     call wait_key
+    call sfx_back
     ret
 
 # end_screen: SI=title, [e_rooms] (-1 = hide), [e_coins]
@@ -904,6 +987,7 @@ end_screen:
     call wait_key
     cmp ax, K_ENTER
     jne .Les2
+    call sfx_menu_ok
     ret
 
 # stage_failed_screen: AX=0 retry, AX=1 return to stage selection.
@@ -953,17 +1037,24 @@ stage_failed_screen:
     je .Lsfs_up
     cmp ax, 115
     je .Lsfs_down
+    cmp ax, 87
+    je .Lsfs_up
+    cmp ax, 83
+    je .Lsfs_down
     cmp ax, K_ENTER
     je .Lsfs_choose
     jmp .Lsfs_key
 .Lsfs_up:
     mov word ptr [failed_sel], 0
+    call sfx_menu_move
     jmp .Lsfs_draw
 .Lsfs_down:
     mov word ptr [failed_sel], 1
+    call sfx_menu_move
     jmp .Lsfs_draw
 .Lsfs_choose:
     call plat_flush_keys
+    call sfx_menu_ok
     mov ax, word ptr [failed_sel]
     ret
 
@@ -1016,17 +1107,24 @@ level_completed_screen:
     je .Llcs_up
     cmp ax, 115
     je .Llcs_down
+    cmp ax, 87
+    je .Llcs_up
+    cmp ax, 83
+    je .Llcs_down
     cmp ax, K_ENTER
     je .Llcs_choose
     jmp .Llcs_key
 .Llcs_up:
     mov word ptr [failed_sel], 0
+    call sfx_menu_move
     jmp .Llcs_draw
 .Llcs_down:
     mov word ptr [failed_sel], 1
+    call sfx_menu_move
     jmp .Llcs_draw
 .Llcs_choose:
     call plat_flush_keys
+    call sfx_menu_ok
     mov ax, word ptr [failed_sel]
     ret
 
@@ -1239,6 +1337,7 @@ play:
 .Lp_restart:
     call game_restart
     call invalidate
+    call sfx_back
     jmp .Lp_dash
 .Lp6:
     cmp ax, 104                      # 'h'
@@ -1248,6 +1347,7 @@ play:
     cmp ax, K_TAB
     jne .Lp7
 .Lp_help:
+    call sfx_menu_ok
     call help_screen
     call plat_flush_keys
     call invalidate
@@ -1260,6 +1360,7 @@ play:
     cmp ax, K_ESC
     jne .Lp_dash
 .Lp_menu:
+    call sfx_back
     ret
 .Lp_dash:
     call game_dashing
@@ -1287,6 +1388,7 @@ play:
     call tick
     test word ptr [p_ev], EV_DEAD
     jz .Lp_noded
+    call sfx_death
     mov word ptr [g_msg], offset str_stage_failed
     mov word ptr [g_msg_t], 0
     call invalidate
@@ -1294,6 +1396,8 @@ play:
     jne .Lp_failed_normal
     mov cx, 20
     call pause_frames
+    call sfx_stop
+    call sfx_gameover
     mov ax, word ptr [g_depth]
     dec ax
     mov word ptr [e_rooms], ax
@@ -1316,6 +1420,7 @@ play:
 .Lp_noded:
     test word ptr [p_ev], EV_CLEAR
     jz .Lp_loop
+    call sfx_clear
     cmp word ptr [g_mode], MODE_NORMAL
     jne .Lp_clear_auto
     call level_completed_screen
@@ -1352,6 +1457,7 @@ play:
     mov ax, word ptr [g_coins]
     mov word ptr [e_coins], ax
     mov si, offset str_win
+    call sfx_win
     call end_screen
     ret
 .Lpc_load:
@@ -1426,7 +1532,12 @@ game_main:
 game_main:
     mov dword ptr [seed], 44257
     mov word ptr [speed_idx], 1
+    mov word ptr [sfx_on], 1
+    mov word ptr [mus_on], 1
+    mov word ptr [mus_ptr], offset mus_theme
+    mov word ptr [mus_timer], 0
     call plat_init
+    call opl_init
 .Lgm_loop:
     cmp word ptr [g_fail_select], 0
     je .Lgm_menu
@@ -1460,6 +1571,8 @@ game_main:
     call settings_screen
     jmp .Lgm_loop
 .Lgm_quit:
+    call opl_note_off
+    call sfx_stop
     call plat_quit
     ret
     .endif
