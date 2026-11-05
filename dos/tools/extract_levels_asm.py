@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract the five campaign maps into the DOS assembly and C reference data.
+"""Compile editable campaign grids into the simulator, DOS assembly, and C data.
 
 Usage: python3 tools/extract_levels_asm.py ../Simulador/tomb_of_mask.asm \
        src/levels.inc reference_c/src/levels.h
@@ -12,31 +12,115 @@ with open(asm_path, encoding="utf-8", errors="replace") as source:
     asm = source.read().replace("\r", "")
 
 
-def num(name):
-    match = re.search(r"static %s \+ #0, #(\d+)" % name, asm)
-    if not match:
-        raise ValueError("missing map metadata: %s" % name)
-    return int(match.group(1))
+def editable_maps(source):
+    maps = {}
+    lines = source.splitlines()
+    index = 0
+    while index < len(lines):
+        begin = re.fullmatch(r"; MAP_EDIT_BEGIN ([1-5])", lines[index])
+        if not begin:
+            index += 1
+            continue
+
+        level_number = int(begin.group(1))
+        if level_number in maps:
+            raise ValueError("duplicate editable map %d" % level_number)
+        index += 1
+        rows = []
+        while index < len(lines):
+            if re.fullmatch(r"; MAP_EDIT_END ([1-5])", lines[index]):
+                break
+            row = re.fullmatch(r"; ?(.*)", lines[index])
+            if not row:
+                raise ValueError("map%d contains a non-comment line" % level_number)
+            rows.append(row.group(1))
+            index += 1
+        if index == len(lines):
+            raise ValueError("map%d is missing MAP_EDIT_END" % level_number)
+        if lines[index] != "; MAP_EDIT_END %d" % level_number:
+            raise ValueError("map%d has a mismatched MAP_EDIT_END" % level_number)
+        if len(rows) != 28:
+            raise ValueError("map%d must contain exactly 28 rows" % level_number)
+        if any(len(row) != 40 for row in rows):
+            raise ValueError("every map%d row must contain exactly 40 tiles" % level_number)
+        maps[level_number] = rows
+        index += 1
+
+    if set(maps) != set(range(1, 6)):
+        raise ValueError("editable map blocks 1 through 5 are required")
+    return maps
 
 
+tile_map = {"#": "}", ".": " ", "C": "#", "S": " ", "E": " "}
+game_tiles = set("}{*$=@%<&^|!")
+maps = editable_maps(asm)
 levels = []
+starts = []
+exits = []
 for i in range(1, 6):
-    match = re.search(r'^level%d : string "(.*)"\s*$' % i, asm, re.M)
-    if not match:
-        raise ValueError("missing level%d map" % i)
-    level = match.group(1)
-    if len(level) != 1200 or '"' in level or "\\" in level:
-        raise ValueError("level%d must be a 1200-character map string" % i)
-    levels.append(level[:40 * 28])
+    cells = []
+    start = None
+    exit_cell = None
+    for y, row in enumerate(maps[i]):
+        for x, tile in enumerate(row):
+            if tile == "S":
+                if start is not None:
+                    raise ValueError("map%d must contain exactly one S start" % i)
+                start = y * 40 + x
+            elif tile == "E":
+                if exit_cell is not None:
+                    raise ValueError("map%d must contain exactly one E exit" % i)
+                exit_cell = y * 40 + x
+            elif tile not in tile_map and tile not in game_tiles:
+                raise ValueError("map%d contains unsupported tile %r at (%d,%d)" %
+                                 (i, tile, x, y))
+            cells.append(tile_map.get(tile, tile))
+    if start is None or exit_cell is None:
+        raise ValueError("map%d must contain exactly one S start and one E exit" % i)
+    starts.append(start)
+    exits.append(exit_cell)
+    levels.append("".join(cells))
 
-starts = [num("start%d" % i) for i in range(1, 6)]
-exits = [num("exit%d" % i) for i in range(1, 6)]
-flips = [num("flip%d" % i) for i in range(1, 6)]
+flips = []
+for i in range(1, 6):
+    match = re.search(r"static flip%d \+ #0, #(\d+)" % i, asm)
+    if not match:
+        raise ValueError("missing map metadata: flip%d" % i)
+    flips.append(int(match.group(1)))
+
+updated_asm = asm
+for i, level in enumerate(levels, 1):
+    match = re.search(r'^level%d : string "(.*)"\s*$' % i, updated_asm, re.M)
+    if not match or len(match.group(1)) != 1200:
+        raise ValueError("level%d must have an existing 1200-character string" % i)
+    encoded = level + match.group(1)[1120:]
+    updated_asm = re.sub(
+        r'^level%d : string ".*"\s*$' % i,
+        'level%d : string "%s"' % (i, encoded),
+        updated_asm,
+        count=1,
+        flags=re.M,
+    )
+    updated_asm, start_count = re.subn(
+        r"(static start%d \+ #0, #)\d+" % i,
+        r"\g<1>%d" % starts[i - 1],
+        updated_asm,
+        count=1,
+    )
+    updated_asm, exit_count = re.subn(
+        r"(static exit%d \+ #0, #)\d+(?:\s*;.*)?$" % i,
+        r"\g<1>%d ; (%d,%d) opening in the outer wall" %
+        (exits[i - 1], exits[i - 1] % 40, exits[i - 1] // 40),
+        updated_asm,
+        count=1,
+        flags=re.M,
+    )
+    if start_count != 1 or exit_count != 1:
+        raise ValueError("missing start/exit metadata for map%d" % i)
+
 for i, level in enumerate(levels):
-    if not 0 <= starts[i] < 40 * 28 or level[starts[i]] != " ":
-        raise ValueError("level%d start must point to a floor tile" % (i + 1))
-    if not 0 <= exits[i] < 40 * 28 or level[exits[i]] != " ":
-        raise ValueError("level%d exit must point to a floor tile" % (i + 1))
+    if level[starts[i]] != " " or level[exits[i]] != " ":
+        raise ValueError("map%d start and exit markers must map to floor" % (i + 1))
 
 assembly = [
     "# generated by tools/extract_levels_asm.py - do not edit",
@@ -76,3 +160,6 @@ c_header.extend([
 ])
 with open(c_output, "w", encoding="utf-8", newline="\n") as output:
     output.write("\n".join(c_header) + "\n")
+
+with open(asm_path, "w", encoding="utf-8", newline="\n") as source:
+    source.write(updated_asm)

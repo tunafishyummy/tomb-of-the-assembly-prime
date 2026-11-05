@@ -108,8 +108,8 @@ in Intel syntax. The output is a flat DOS `.COM` file.
        make levels
        make
 
-   This copies the five maps from `Simulador/tomb_of_mask.asm` into the DOS build and creates a fresh
-   `TOMB.COM`. Run it as in Part 1; choose **NORMAL MODE** to play the campaign. Endless mode
+   This compiles the five editable map grids from `Simulador/tomb_of_mask.asm` into the DOS build and
+   creates a fresh `TOMB.COM`. Run it as in Part 1; choose **NORMAL MODE** to play the campaign. Endless mode
    continues to use generated rooms.
 
 ### On Linux / macOS (with an x86 binutils)

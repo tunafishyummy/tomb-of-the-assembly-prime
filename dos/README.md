@@ -40,8 +40,15 @@ looks different.
     dos/   TOMB.COM  RUN.BAT  tomb.conf  HOW_TO_RUN.md  Makefile  src/  tools/  tests/  reference_c/
     Simulador/   patched tomb_of_mask.asm / .mif for the original simulator (faster room change)
 
-To regenerate both map copies after editing the five simulator maps, run from `dos/`:
+Edit the `MAP_EDIT` grids in `Simulador/tomb_of_mask.asm`. Each map is 28 rows by 40 columns:
+`#` is a wall, `.` is floor, `C` is a crate, and `S`/`E` mark the player start and exit.
+Other tiles use their in-game symbols, such as `*` for a coin, `{` for a trap, `$` for a key,
+`=` for a door, `&` for a bomb, and `|` for a breakable wall. Keep every row exactly 40 characters
+wide. The compact simulator strings and DOS map data are generated from these grids.
+
+After editing a grid, regenerate the map data from `dos/`:
 
     python3 tools/extract_levels_asm.py ../Simulador/tomb_of_mask.asm src/levels.inc reference_c/src/levels.h
 
-On Windows, use `py -3` in place of `python3`.
+This also refreshes the compact map strings and start/exit metadata in `Simulador/tomb_of_mask.asm`.
+On Windows, use `py -3` in place of `python3`, or run `make levels` from WSL.
