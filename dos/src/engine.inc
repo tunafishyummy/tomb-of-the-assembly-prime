@@ -1,9 +1,8 @@
 # ============================================================================
-#  Game rules (dash, crates, doors, plates, levers, bombs, shield, traps).
-#  Works on the current room 'room' and the g_* game variables.
+#  Game rules
 # ============================================================================
     .text
-# copy_room: SI=source room, DI=destination room (both in the data segment)
+# copy_room
 copy_room:
     push es
     push ds
@@ -14,7 +13,7 @@ copy_room:
     pop es
     ret
 
-# room_load_level: AX = level index (0..4), DI = destination room
+# room_load_level
 room_load_level:
     mov word ptr [rl_dst], di
     mov word ptr [rl_idx], ax
@@ -53,7 +52,7 @@ room_load_level:
 .Lrl_ret:
     ret
 
-# game_reset_player: shared by enter/restart
+# game_reset_player
 game_reset_player:
     mov ax, word ptr [room+R_SX]
     mov word ptr [g_px], ax
@@ -71,7 +70,7 @@ game_reset_player:
     mov word ptr [g_msg], offset str_empty
     ret
 
-game_enter_room:                     # remember the pristine room for restarts
+game_enter_room:                     # save for restart
     mov si, offset room
     mov di, offset orig
     call copy_room
@@ -89,7 +88,7 @@ game_restart:
     mov word ptr [g_coins], ax
     ret
 
-# game_dash: AX=dx, BX=dy.  Starts a dash unless one is running.
+# game_dash
 game_dash:
     mov cx, word ptr [g_dx]
     or cx, word ptr [g_dy]
@@ -107,7 +106,7 @@ game_dash:
 .Lgd_no:
     ret
 
-# game_dashing: ZF clear if a dash is running
+# game_dashing
 game_dashing:
     mov ax, word ptr [g_dx]
     or ax, word ptr [g_dy]
@@ -126,7 +125,7 @@ open_gates:                          # every gate becomes floor
     loop .Log1
     ret
 
-flip_layout:                         # lever: toggle the listed wall cells
+flip_layout:                         # lever toggle
     xor bx, bx
 .Lfl1:
     cmp bx, word ptr [room+R_NFLIP]
@@ -147,8 +146,7 @@ flip_layout:                         # lever: toggle the listed wall cells
 .Lfl_ret:
     ret
 
-# begin_step: what happens when the dash tries to enter the next tile.
-#   AL = 0 stop, 1 tile entered, 2 dead.  Event bits are OR-ed into [ev_acc].
+# begin_step
 begin_step:
     mov ax, word ptr [g_px]
     add ax, word ptr [g_dx]
@@ -305,7 +303,7 @@ begin_step:
     mov al, 1
     ret
 
-# game_tick: AX = pixels to advance.  Returns AX = EV_* flags.
+# game_tick
 game_tick:
     mov word ptr [gt_px], ax
     mov word ptr [ev_acc], 0
@@ -332,7 +330,7 @@ game_tick:
     sub word ptr [gt_px], ax
     cmp word ptr [g_prog], 16
     jl .Lgt_loop
-    # Do not write trail tiles into the room: dash marks are visual-only.
+    # no trail tiles in room
 .Lgt_no_trail:
     mov ax, word ptr [g_dx]
     add word ptr [g_px], ax
@@ -358,7 +356,7 @@ game_tick:
     mov ax, word ptr [ev_acc]
     ret
 
-# game_bomb: break weak walls next to the player.
+# game_bomb
 game_bomb:
     cmp word ptr [g_bombs], 0
     jg .Lgb1

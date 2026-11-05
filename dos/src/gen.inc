@@ -1,21 +1,12 @@
 # ============================================================================
-#  Endless-mode room generator and solver (port of the reference C version;
-#  the order of every random call is the same, so rooms are identical).
-#
-#  Rooms are tall "temple" mazes: a lattice of 3x3 blocks (1 corridor cell +
-#  2 thick walls), a depth-first spanning tree, extra passages for loops, open
-#  chambers with pillars, and a left/right mirror in about 60% of the rooms.
-#  The player starts at the bottom and climbs to an opening in the top wall.
-#  Traps, coins and shields are placed with the solver, so every room can be
-#  finished, nobody can get stranded, and every coin lies on a real dash.
+#  Endless-mode
 # ============================================================================
     .equ MAXNX, 12
     .equ MAXNY, 16
     .equ EDGE_EXIT, 255
     .text
 
-# gfill: fill a rectangle of the room [gp_r] with a tile.  AX=x0 BX=y0 CX=x1 DX=y1 DI=tile
-gfill:
+# gfill
     mov word ptr [f_x0], ax
     mov word ptr [f_y0], bx
     mov word ptr [f_x1], cx
@@ -46,8 +37,7 @@ gfill:
 .Lgf_done:
     ret
 
-# glink: open the passage between lattice nodes (i0,j0) and (i1,j1).  AX=i0 BX=j0 CX=i1 DX=j1
-glink:
+# glink
     imul ax, ax, 3
     inc ax
     imul bx, bx, 3
@@ -67,7 +57,7 @@ glink:
     mov di, T_FLOOR
     jmp gfill
 
-# gfree8: AX=x BX=y -> AL=1 when the cell and all 8 neighbours are floor
+# gfree8: all 8 neighbours are floor
 gfree8:
     mov word ptr [fr_x], ax
     mov word ptr [fr_y], bx
@@ -95,7 +85,7 @@ gfree8:
     xor al, al
     ret
 
-# layout: build the walls/corridors of room [gp_r].  [l_nx],[l_ny],[l_mirror],[l_depth] are the inputs.
+# layout: build the walls/corridors of room.
 layout:
     mov bp, word ptr [gp_r]
     mov ax, word ptr [l_nx]
@@ -464,7 +454,7 @@ layout:
     ret
 
 # ---------------------------------------------------------------- solver
-# slide_len: SI = start cell, DI = direction -> AX = slide length (0 none, 255 reaches the exit)
+# slide_len
 slide_len:
     mov bp, word ptr [gp_r]
     mov ax, si
@@ -545,7 +535,7 @@ good_set:
     or byte ptr [good+bx], al
     ret
 
-# edge_target: SI = state, DI = direction (edge present, not exit) -> AX = target cell
+# edge_target:
 edge_target:
     mov bp, word ptr [gp_r]
     mov bx, di
@@ -561,9 +551,7 @@ edge_target:
     add ax, si
     ret
 
-# room_solve: breadth first search over rest positions of room [gp_r].
-#   returns AX = number of dashes to the exit (-1 none), [sv_str] = rest positions that can no
-#   longer reach the exit.  Fills gdist[], edge[] and queue[].
+# room_solve
 room_solve:
     mov bp, word ptr [gp_r]
     mov ax, word ptr [bp+R_W]
@@ -716,7 +704,7 @@ room_solve:
     ret
 
 # ---------------------------------------------------------------- traps and coins
-# place_traps: AX = depth, BX = minimum exit distance
+# place_traps
 place_traps:
     mov word ptr [pt_min], bx
     mov bx, ax
@@ -922,9 +910,7 @@ decorate:
 .Ldc_ret:
     ret
 
-# Place guaranteed puzzle items on floor cells away from start/exit.
-# One key and one locked door are paired; a bomb and a pushable crate are also added.
-place_key_bomb:
+#puzzle items
     mov bp, word ptr [gp_r]
     mov ax, word ptr [bp+R_SY]
     imul ax, word ptr [bp+R_W]
@@ -1031,7 +1017,7 @@ place_key_bomb:
 .Lpkb_done:
     ret
 
-# gen_room: DI = room to fill, AX = depth (1..).  Uses and updates the global [seed].
+# gen_room
 gen_room:
     mov word ptr [gp_r], di
     mov word ptr [gd_depth], ax

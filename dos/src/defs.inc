@@ -1,13 +1,12 @@
 # ============================================================================
-#  Tomb of the Assembly - DOS edition (16-bit real mode, .COM, 80386+)
-#  Constants and room layout.  Syntax: GNU as, Intel (noprefix).
+#  Constants and room layout
 # ============================================================================
     .equ MAXW, 40
     .equ MAXH, 52
     .equ MAXCELLS, 2080              # MAXW*MAXH
     .equ NUM_LEVELS_UNUSED, 5
 
-# --- Room record: size word, start/exit cells, lever list, then the tile bytes
+# --- Room record
     .equ R_W, 0                      # width  (tiles)
     .equ R_H, 2                      # height (tiles)
     .equ R_SX, 4                     # player start
@@ -19,7 +18,7 @@
     .equ R_C, 22                     # MAXCELLS bytes of tiles
     .equ ROOMSZ, 2102                # 22 + MAXCELLS
 
-# --- Tile characters (same as the ICMC version)
+# --- Tiles
     .equ T_FLOOR, 32                 # ' '
     .equ T_WALL, 125                 # '}'
     .equ T_TRAP, 123                 # '{'
@@ -43,7 +42,7 @@
     .equ VIEW_W, 320
     .equ VIEW_H, 168                 # game view, the HUD uses the 32 lines below
 
-# --- Keys returned by plat_key (ASCII for normal keys)
+# --- Keys
     .equ K_NONE, 0
     .equ K_UP, 1001
     .equ K_DOWN, 1002
@@ -53,7 +52,7 @@
     .equ K_ESC, 27
     .equ K_TAB, 9
 
-# --- Game modes and engine events
+# --- Modes, events
     .equ MODE_NORMAL, 1
     .equ MODE_ENDLESS, 2
     .equ EV_CLEAR, 1

@@ -1,7 +1,5 @@
 # ============================================================================
-#  Graphics: clipped tile blits, text, auto-tiled walls, spiked traps, HUD.
-#  All drawing goes to the back buffer (ES).  Sets gfx_dirty so the main loop
-#  knows a copy to the screen is needed.
+#  Graphics
 # ============================================================================
     .text
 clip_all:

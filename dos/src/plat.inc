@@ -1,9 +1,8 @@
 # ============================================================================
-#  Platform layer: VGA mode 13h, double buffer, vsync, BIOS keyboard, timer.
-#  ES always holds the back-buffer segment while the game runs.
+#  Platform layer (VGA, keys, timer)
 # ============================================================================
     .text
-# plat_init: set mode 13h, load the palette, find the back buffer (the 64K behind us)
+# plat_init
 plat_init:
     mov ax, cs
     add ax, 0x1000
@@ -38,7 +37,7 @@ plat_quit:                           # back to text mode
     int 0x10
     ret
 
-# plat_present: copy the back buffer to the screen
+# plat_present
 plat_present:
     push ds
     push es
@@ -55,7 +54,7 @@ plat_present:
     pop ds
     ret
 
-# plat_wait_frame: wait for the start of the next vertical retrace (70 Hz)
+# plat_wait_frame
 plat_wait_frame:
     mov dx, 0x3DA
 .Lpw1:
@@ -68,7 +67,7 @@ plat_wait_frame:
     jz .Lpw2
     ret
 
-# plat_key: AX = next key (K_xxx or ASCII), 0 if none. Never blocks.
+# plat_key
 plat_key:
     mov ah, 1
     int 0x16
@@ -116,7 +115,7 @@ plat_flush_keys:
 .Lpf2:
     ret
 
-# plat_ticks: EAX = BIOS tick counter
+# plat_ticks
 plat_ticks:
     xor ax, ax
     int 0x1A
@@ -125,7 +124,7 @@ plat_ticks:
     mov ax, dx
     ret
 
-# seed_mix: mix a key code (AX) and the clock into the random seed
+# seed_mix
 seed_mix:
     push eax
     push ebx
@@ -140,7 +139,7 @@ seed_mix:
     pop eax
     ret
 
-# rng_next: EAX = next 15-bit random number (same LCG as the C reference)
+# rng_next
 rng_next:
     push edx
     mov eax, dword ptr [seed]
@@ -153,7 +152,7 @@ rng_next:
     pop edx
     ret
 
-# rnd: AX = random number in 0..CX-1   (preserves everything else)
+# rnd
 rnd:
     push edx
     push ecx

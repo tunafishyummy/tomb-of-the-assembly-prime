@@ -2,7 +2,7 @@
 #  Game flow: frame timing, camera, menus, room transitions, main loop.
 # ============================================================================
     .text
-# key classifiers: AX = key -> DL = 1 / 0 (AX preserved)
+# key checks
 is_up:
     mov dl, 1
     cmp ax, K_UP
@@ -48,7 +48,7 @@ is_right:
 .Lir:
     ret
 
-# tick: wait for the retrace, then show whatever was drawn since the last frame
+# tick
 tick:
     call plat_wait_frame
     cmp byte ptr [gfx_dirty], 0
@@ -63,7 +63,7 @@ invalidate:
     mov word ptr [last_valid], 0
     ret
 
-# wait_key: block until a key is pressed, AX = key
+# wait_key: block until a key is pressed
 wait_key:
     call plat_flush_keys
 .Lwk1:
@@ -74,7 +74,7 @@ wait_key:
     call seed_mix
     ret
 
-# clamp_cam: AX=wanted scroll, BX=map size px, CX=view size px -> AX (small maps are centred)
+# clamp_cam: (small maps are centred)
 clamp_cam:
     mov dx, bx
     sub dx, cx                       # max scroll
